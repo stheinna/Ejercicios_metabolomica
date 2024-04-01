@@ -1,0 +1,42 @@
+# Creador: Stheinna
+# Actividad en Clase: Aprendiendo a usar R
+
+CHO <- 535000
+VERO <- 1350000
+CHO+VERO
+Total <- CHO+VERO
+Total
+
+#hola
+
+x <- 35
+y <- 22
+w <- "34"
+z <- "25"
+x+y
+w+z
+
+V1 <- c(1,2,3)
+V2 <- c(4,5,6)
+V3 <- c(7,8,9)
+V4 <- c("M","D","Z")
+DF_v <-data.frame(V4,V1,V2,V3)
+View(DF_v)
+
+install.packages("readr")
+library("readr")
+
+datos_titulacion_2_ <- read_csv("Desktop/R/datos_titulacion (2).csv")
+View(datos_titulacion_2_)
+Titulación<-read_csv("Desktop/R/datos_titulacion (2).csv")
+
+Titulación<- read_csv(file="https://raw.githubusercontent.com/ManuelLaraMVZ/titulacion_amino_acidos/main/datos_titulacion%20(2).csv")
+head(Titulación)
+
+install.packages("ggplot2")
+library("ggplot2")
+
+Gráfica<-ggplot(Titulación,aes(x=Volumen,y=pH))+
+                    geom_point()+
+                    labs(title="Titulación",x="Volumen",y="pH")
+Gráfica
