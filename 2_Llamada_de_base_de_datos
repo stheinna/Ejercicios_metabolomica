@@ -1,0 +1,39 @@
+# Creador: Stheinna Rius
+# Llamada de bases de datos
+
+###########################################################
+
+# 1) Llamar la base de datos desde la computadora
+
+install.packages("readr")
+library(readr)
+
+read_csv(file="1.2 datos_titulacion (2).csv")
+titulacion <- read_csv(file="1.2 datos_titulacion (2).csv")
+
+###########################################################
+
+# 2) Llamar desde un repositorio (internet)
+
+repositorio <- read_csv(file="https://raw.githubusercontent.com/ManuelLaraMVZ/titulacion_amino_acidos/main/datos_titulacion%20(2).csv")
+head(repositorio) #para ver el encabezado
+View(repositorio) #para ver la tabla 
+
+###########################################################
+
+# 3) Para hacer gráficas
+
+install.packages("ggplot2")
+library(ggplot2)
+
+grafica <- ggplot(repositorio, 
+                  aes(x=Volumen, y=pH))+
+  geom_line()+
+  labs(title="Titulación Cisteína",
+       x="Volumen (uL)",
+       y="Valor de pH")+
+  theme_dark()
+grafica
+
+ggsave("2.3 Titulación Cisteína.jpeg", 
+       plot =grafica, width=6, height=4, dpi=500) #para guardarlo en mejor resolución
