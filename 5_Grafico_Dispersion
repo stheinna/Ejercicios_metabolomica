@@ -1,0 +1,143 @@
+# Creador: Stheinna Rius
+# Gráfica de dispersión
+
+############################################
+
+# Se realiza una serie de experimentos comparativos de cerebros de tres animales
+# destetados cuyas madres estuvieron expuestas a una dieta restrictivas 
+# (desnutridas) y se compararon con tres animales cuyas madres se expusieron a 
+# una dieta ad libitum (eunutridas). Se desea saber: ¿Qué miRNAs fueron los que 
+# más cambiaron entre los animales desnutridos (tratamiento) comparados con los 
+# animales eunutridos (control)?
+
+############################################
+
+# 1) Llamar a la base de datos
+
+install.packages("pacman")
+library(pacman)
+
+p_load("readr", 
+       "ggplot2",
+       "ggrepel",
+       "dplyr")
+
+datos <- read_csv(file="https://raw.githubusercontent.com/ManuelLaraMVZ/Transcript-mica/main/DesnutridasvsEunutridas.csv")
+head(datos)
+
+############################################
+
+# 2) Identificar los genes controles o de referencia
+
+gen_referencia <- datos %>%
+  filter(Condicion=="Control")
+head(gen_referencia)
+
+############################################
+
+# 3) Sacar promedios CT
+
+promedio_referencia <- gen_referencia %>%
+  summarise(Mean_C1=mean(Cx1),
+            Mean_C2=mean(Cx2),
+            Mean_C3=mean(Cx3),
+            Mean_T1=mean(T1),
+            Mean_T2=mean(T2),
+            Mean_T3=mean(T3),) %>%
+  mutate(Gen="Promedio_referencia") %>%
+  select(7,1,2,3,4,5,6)
+promedio_referencia  
+
+############################################
+
+# 4) Identificar los genes de interés 
+
+gen_interes <- datos %>%
+  filter(Condicion=="Target") %>%
+  select(-2)
+head(gen_interes)
+
+############################################
+
+# 5) Sacar el 2^-DCT
+
+DCT <- gen_interes %>%
+  mutate(DCT_C1=2^-(Cx1-promedio_referencia$Mean_C1),
+         DCT_C2=2^-(Cx2-promedio_referencia$Mean_C2),
+         DCT_C3=2^-(Cx3-promedio_referencia$Mean_C3),
+         DCT_T1=2^-(T1-promedio_referencia$Mean_T1),
+         DCT_T2=2^-(T2-promedio_referencia$Mean_T2),
+         DCT_T3=2^-(T3-promedio_referencia$Mean_T3)) %>%
+  select(-2,-3,-4,-5,-6,-7)
+DCT
+
+############################################
+
+# 6) Sacar el promedio de los 2^-DCT
+
+promedio_genes_interes <- DCT %>%
+  mutate(Mean_DCT_Cx=((DCT_C1+DCT_C2+DCT_C3)/3),
+         Mean_DCT_Tx=((DCT_T1+DCT_T2+DCT_T3)/3))
+promedio_genes_interes
+
+############################################
+
+# 7) Gráfico de dispersión 
+
+grafica_dispersion <- ggplot(promedio_genes_interes,
+                             mapping = aes(x=Mean_DCT_Cx,
+                                 y=Mean_DCT_Tx))+
+  geom_point(size=2,
+             color="purple")
+grafica_dispersion
+
+grafica_dispersion2 <- grafica_dispersion+
+  labs(title = "Condición Control vs Tratamiento",
+       caption = "Creador: Stheinna",
+       x=expression("Control 2"^"-DCT"),
+       y=expression("Tratamiento 2"^"-DCT"))+
+  geom_smooth(method= "lm",
+              color="black")+
+  theme_minimal()+
+  theme(
+    plot.title = element_text(family = "Times New Roman", size = 16, face = "bold", hjust = 0.5),
+    plot.caption = element_text(face = "italic"),
+    panel.background = element_rect(fill = "white"),
+    panel.grid.major = element_blank(),
+    axis.text = element_text(family = "Times New Roman", size = 12),
+    axis.title.x = element_text(family = "Times New Roman", size = 14, face = "bold"),
+    axis.title.y = element_text(family = "Times New Roman", size = 14, face = "bold"),
+    legend.title = element_text(family = "Times New Roman", size = 14),
+    legend.text = element_text(family = "Times New Roman", size = 12))
+grafica_dispersion2
+
+top_10 <- promedio_genes_interes %>%
+  select(1,8,9) %>%
+  top_n(10, Mean_DCT_Cx) %>%
+  arrange(desc(Mean_DCT_Cx))
+head(top_10)
+
+grafica_dispersion3 <- grafica_dispersion2 +
+  geom_label_repel(data = top_10,
+                   mapping = aes(x = Mean_DCT_Cx, 
+                                 y = Mean_DCT_Tx,
+                                 label = Gen),
+                   label.padding = unit(0.2, "lines"))
+grafica_dispersion3
+
+ggsave("5.3 Gráfico de Dispersión.jpeg",
+       plot = grafica_dispersion3,
+       height = 5,
+       width = 7,
+       dpi = 300)
+
+############################################
+
+# Al obtener la ecuación de la recta de la regresión lineal en el gráfico de 
+# dispersión, los puntos más alejados son los de interés ya que estos son los 
+# que cambian más en el tratamiento a comparación del control. No obstante, 
+# se realizó una tabla donde se extraen los 10 genes que más cambiaron (top_ten). 
+# Por lo tanto en el gráfico se visualizan esos miRNA y esos miRNA son los que 
+# más cambiaron entre los animales desnutridos (tratamiento) comparados con los 
+# animales eunutridos (control), siendo mmu-miR-1897-5p, mmu-miR-1961, 
+# mmu-miR-374, mmu-miR-140-3p, mmu-miR-1982.2, mmu-miR-9. 
