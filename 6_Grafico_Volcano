@@ -1,0 +1,218 @@
+# Creador: Stheinna Rius
+# Gráfica de Volcano
+
+############################################
+
+# 1) Llamar a la base de datos
+
+install.packages("pacman")
+library(pacman)
+
+p_load("readr",
+       "ggplot2",
+       "ggrepel",
+       "dplyr",
+       "matrixTests") #para análisis estadístico 
+
+datos <- read_csv(file="https://raw.githubusercontent.com/ManuelLaraMVZ/Transcript-mica/main/datos_miRNAs.csv")
+head(datos)
+
+############################################
+
+# 2) Extracción de genes controles o de referencia
+
+controles <- datos %>%
+  filter(Condicion=="Control")
+head(controles)
+
+############################################
+
+# 3) Sacar promedios CT
+
+promedio_controles <- controles %>%
+  summarise(Mean_C1=mean(Cx1),
+            Mean_C2=mean(Cx2),
+            Mean_C3=mean(Cx3),
+            Mean_T1=mean(T1),
+            Mean_T2=mean(T2),
+            Mean_T3=mean(T3),) %>%
+  mutate(Gen="Promedio_controles") %>%
+  select(7,1,2,3,4,5,6)
+promedio_controles
+
+############################################
+
+# 3) Extraer los genes de interés de la tabla "datos"
+
+genes <- datos %>%
+  filter(Condicion=="Target") %>%
+  select(-2)
+head(genes)
+
+############################################
+
+# 4) Sacar el 2^-DCT
+
+DCT<- genes %>%
+  mutate(DCT_C1=2^-(Cx1-promedio_controles$Mean_C1),
+         DCT_C2=2^-(Cx2-promedio_controles$Mean_C2),
+         DCT_C3=2^-(Cx3-promedio_controles$Mean_C3),
+         DCT_T1=2^-(T1-promedio_controles$Mean_T1),
+         DCT_T2=2^-(T2-promedio_controles$Mean_T2),
+         DCT_T3=2^-(T3-promedio_controles$Mean_T3)) %>%
+  select(-2,-3,-4,-5,-6,-7)
+DCT
+
+############################################
+
+# 5) Sacar el promedio de 2^-DCT
+
+promedio_DCT <- DCT %>%
+  mutate(Mean_DCT_Cx=((DCT_C1+DCT_C2+DCT_C3)/3),
+         Mean_DCT_Tx=((DCT_T1+DCT_T2+DCT_T3)/3))
+promedio_DCT
+
+############################################
+
+# 6) Análalisis estadístico por prueba T
+
+tvalue_gen <- row_t_welch(promedio_DCT[,c("DCT_C1",
+                                          "DCT_C2",
+                                          "DCT_C3")],
+                          promedio_DCT[,c("DCT_T1",
+                                          "DCT_T2",
+                                          "DCT_T3")])
+tvalue_gen
+View(tvalue_gen)
+
+FCyPV <- promedio_DCT %>%
+  select(1,8,9) %>%
+  mutate(pvalue=tvalue_gen$pvalue) %>%
+  mutate(foldchange=(Mean_DCT_Tx/Mean_DCT_Cx)) %>%
+  select(1,4,5)
+FCyPV
+
+############################################
+
+# 7) Valores para graficar
+
+Logs <- FCyPV %>%
+  mutate(LPV=-log10(pvalue),
+         LFC=log2(foldchange)) %>%
+  select(1,4,5)
+Logs
+
+############################################
+
+# 8) Gráfica de volcano
+
+grafico_volcano <- ggplot(data = Logs,
+                   mapping = aes(x=LFC,
+                                 y=LPV))+
+  geom_point(size=2,
+             color="gray")+
+  theme_classic(base_family = "Times New Roman") + 
+  labs(title = "Análisis comparativo de miRNAs",
+       caption = "Creador: Stheinna") +
+  xlab("Log2(2-DDCT)") +
+  ylab("-Log10(valor de p)")
+grafico_volcano
+
+############################################
+
+# 9) Límites del valor de p y fold change 
+
+limite_p <- 0.05 
+
+limite_FC <- 1.5
+
+############################################
+
+# 10) Identificar genes que se expresan más que el control o menos que el control
+
+down_regulated <- Logs %>%
+  filter(LFC < -log2(limite_FC),
+         LPV > -log10(limite_p))
+down_regulated
+
+up_regulated <- Logs %>%
+  filter(LFC > log2(limite_FC),
+         LPV > -log10(limite_p))
+up_regulated
+
+top_down_regulated <- down_regulated %>%
+  arrange(desc(LPV)) %>%
+  head(5)
+top_down_regulated
+
+top_up_regulated <- up_regulated %>%
+  arrange(desc(LPV)) %>%
+  head(5)
+top_up_regulated
+
+############################################
+
+# 11) Mejorar la gráfica de volcano
+
+grafico_volcano1 <- grafico_volcano +
+  geom_hline(yintercept = -log10(limite_p), linetype = "dashed") +
+  geom_vline(xintercept = -log2(limite_FC), linetype = "dashed") +
+  geom_vline(xintercept = log2(limite_FC), linetype = "dashed")
+grafico_volcano1
+
+grafico_volcano2 <- grafico_volcano1 +
+  geom_point(data = up_regulated,
+             x=up_regulated$LFC,
+             y=up_regulated$LPV,
+             alpha=1,
+             size=3,
+             color="#E64B35B2")+
+  geom_point(data = down_regulated,
+             x=down_regulated$LFC,
+             y=down_regulated$LPV,
+             alpha=1,
+             size=3,
+             color="#3C5488B2")
+grafico_volcano2
+
+grafico_volcano3 <- grafico_volcano2 +
+  geom_label_repel(
+    data = top_up_regulated,
+    aes(x = LFC, y = LPV, label = Gen),
+    box.padding = unit(0.35,"lines"),
+    point.padding = unit(0.5,"lines"),
+    segment.color = "grey",
+    segment.size = 0.2,
+    nudge_x = 0.8,  
+    nudge_y = 0.3,
+    max.overlaps = 50, 
+    show.legend = FALSE)+
+  geom_label_repel(
+    data = top_down_regulated,
+    aes(x = LFC, y = LPV, label = Gen),
+    box.padding = unit(0.35,"lines"),
+    point.padding = unit(0.5,"lines"),
+    segment.color = "grey",
+    segment.size = 0.2,
+    nudge_x = -3,  
+    nudge_y = 0.2,
+    max.overlaps = 50, 
+    show.legend = FALSE)
+grafico_volcano3
+
+grafico_volcano4 <- grafico_volcano3 +
+  theme(
+  plot.title = element_text(size = 16, face = "bold", hjust = 0.5), 
+  axis.title.x = element_text(size = 14, face = "bold"), 
+  axis.title.y = element_text(size = 14, face = "bold"), 
+  axis.text.x = element_text(size = 12), 
+  axis.text.y = element_text(size = 12), 
+  legend.title = element_text(size = 12, face = "bold"), 
+  legend.text = element_text(size = 12))
+grafico_volcano4
+
+ggsave("6.2 Gráfico de Volcano.jpeg",
+       plot = grafico_volcano4,
+       height = 5,
+       width = 7,
+       dpi = 300)
